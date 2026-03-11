@@ -1,0 +1,19 @@
+{
+  "functions": {
+    "app/api/queues/metering/route.ts": {
+      "experimentalTriggers": [
+        {
+          "type": "queue/v2beta",
+          "topic": "metering-events"
+        }
+      ]
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/internal/metering/cleanup",
+      "schedule": "17 3 * * *"
+    }
+  ]
+}
+

@@ -1,0 +1,51 @@
+// Minimal Prisma schema for metering subsystem.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model MeteringEvent {
+  id         String   @id
+  eventKey   String   @unique
+  subjectKey String
+  metricKey  String
+  quantity   BigInt
+  occurredAt DateTime
+  ingestedAt DateTime
+  source     String?
+  metadata   Json?
+
+  @@index([subjectKey, metricKey, occurredAt], name: "idx_m_event_subject_metric_occurred")
+  @@index([metricKey, occurredAt], name: "idx_m_event_metric_occurred")
+  @@index([ingestedAt], name: "idx_m_event_ingested")
+}
+
+model MeteringRollupDay {
+  subjectKey String
+  metricKey  String
+  bucketDate DateTime
+  total      BigInt
+  eventCount BigInt
+  updatedAt  DateTime
+
+  @@id([subjectKey, metricKey, bucketDate])
+  @@index([metricKey, bucketDate], name: "idx_m_rollup_metric_bucket")
+  @@index([bucketDate], name: "idx_m_rollup_bucket")
+}
+
+model MeteringGlobalRollupDay {
+  metricKey  String
+  bucketDate DateTime
+  total      BigInt
+  eventCount BigInt
+  updatedAt  DateTime
+
+  @@id([metricKey, bucketDate])
+  @@index([bucketDate], name: "idx_m_global_rollup_bucket")
+}
+

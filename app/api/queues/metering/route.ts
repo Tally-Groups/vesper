@@ -5,18 +5,22 @@ import { CanonicalMeteringEventPayload } from '@/lib/metering/types';
 
 export const runtime = 'nodejs';
 
-export const POST = handleCallback(async (message: any) => {
-  const payload: CanonicalMeteringEventPayload = {
-    eventKey: message.eventKey,
-    subjectKey: message.subjectKey,
-    metricKey: message.metricKey,
-    quantity: BigInt(message.quantity),
-    occurredAt: new Date(message.occurredAt),
-    source: message.source,
-    metadata: message.metadata,
-  };
+export const POST = handleCallback(async (message: any | any[]) => {
+  const messages = Array.isArray(message) ? message : [message];
 
   await prisma.$transaction(async (tx) => {
-    await processMeteringEventInTransaction(tx, payload);
+    for (const item of messages) {
+      const payload: CanonicalMeteringEventPayload = {
+        eventKey: item.eventKey,
+        subjectKey: item.subjectKey,
+        metricKey: item.metricKey,
+        quantity: BigInt(item.quantity),
+        occurredAt: new Date(item.occurredAt),
+        source: item.source,
+        metadata: item.metadata,
+      };
+
+      await processMeteringEventInTransaction(tx, payload);
+    }
   });
 });

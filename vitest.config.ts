@@ -10,9 +10,11 @@ export default defineConfig({
       reporter: ['text', 'lcov'],
       include: ['lib/metering/**/*.ts'],
       exclude: ['lib/metering/**/*.test.ts'],
-      lines: 95,
-      functions: 95,
-      statements: 95,
+      thresholds: {
+        lines: 95,
+        functions: 95,
+        statements: 95,
+      },
     },
   },
 });

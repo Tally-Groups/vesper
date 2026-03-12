@@ -3,8 +3,8 @@ import { getLongitudinalUsage } from '@/lib/metering/get-longitudinal-usage';
 import { frequencySchema } from '@/lib/metering/validators';
 
 // RESTful longitudinal usage endpoint for a metric across subjects.
-// metricKey now comes from the URL path; range, frequency, and subjectKeys stay in the query string.
-export const runtime = 'edge';
+// Uses the Node.js runtime because it depends on Prisma Client, which is not supported on the edge runtime.
+export const runtime = 'nodejs';
 
 type RouteParams = {
   metricKey: string;

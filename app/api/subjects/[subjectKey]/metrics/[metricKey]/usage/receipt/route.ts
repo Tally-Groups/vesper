@@ -3,8 +3,8 @@ import { getUserUsageReceipt } from '@/lib/metering/get-user-usage-receipt';
 import { periodTypeSchema } from '@/lib/metering/validators';
 
 // RESTful usage receipt endpoint for a specific subject and metric.
-// subjectKey and metricKey now come from the URL path; period parameters stay in the query string.
-export const runtime = 'edge';
+// Uses the Node.js runtime because it depends on Prisma Client, which is not supported on the edge runtime.
+export const runtime = 'nodejs';
 
 type RouteParams = {
   subjectKey: string;

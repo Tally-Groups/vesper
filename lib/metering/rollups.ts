@@ -24,7 +24,8 @@ export async function processMeteringEventInTransaction(
         occurredAt: payload.occurredAt,
         ingestedAt: now,
         source: payload.source,
-        metadata: payload.metadata ?? undefined,
+        // Cast metadata into Prisma's JSON input type; our domain model uses a plain Record.
+        metadata: (payload.metadata ?? undefined) as unknown as Prisma.InputJsonValue | undefined,
       },
     });
   } catch (err) {

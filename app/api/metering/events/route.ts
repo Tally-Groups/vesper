@@ -2,7 +2,8 @@ import { NextRequest } from 'next/server';
 import { triggerEvent } from '@/lib/metering/trigger-event';
 import { verifySignature } from '@/lib/metering/hmac';
 
-export const runtime = 'edge';
+// Use the Node.js runtime so we can rely on Node APIs (Prisma, crypto, etc.) in the metering pipeline.
+export const runtime = 'nodejs';
 
 export async function POST(req: NextRequest) {
   const secret = process.env.METERING_HMAC_SECRET;

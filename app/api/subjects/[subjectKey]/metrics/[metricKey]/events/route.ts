@@ -15,7 +15,7 @@ type RouteParams = {
 
 export async function POST(
   req: NextRequest,
-  context: { params: RouteParams },
+  context: { params: Promise<RouteParams> },
 ) {
   const secret = process.env.METERING_HMAC_SECRET;
   if (!secret) {
@@ -70,7 +70,7 @@ export async function POST(
     return new Response(JSON.stringify({ error: 'Invalid JSON body' }), { status: 400 });
   }
 
-  const { subjectKey, metricKey } = context.params;
+  const { subjectKey, metricKey } = await context.params;
 
   const input: TriggerEventInput = {
     subjectKey,

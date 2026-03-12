@@ -1,0 +1,617 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Vesper Metering API",
+    "version": "0.1.0",
+    "description": "Basic OpenAPI description for the metering ingestion endpoint."
+  },
+  "paths": {
+    "/api/subjects/{subjectKey}/metrics/{metricKey}/events": {
+      "post": {
+        "summary": "Create a metering event for a subject and metric",
+        "description": "Creates a single metering event for the given subject and metric and either enqueues it for asynchronous processing or processes it inline.",
+        "operationId": "createSubjectMetricEvent",
+        "security": [
+          {
+            "MeteringHmac": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "subjectKey",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Identifier for the subject (e.g. user or account) the usage should be attributed to."
+          },
+          {
+            "name": "metricKey",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Identifier for the metric being recorded."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TriggerEventInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Event accepted for processing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TriggerEventResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid JSON body or parameters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid metering signature.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server-side error (e.g. missing secret or failed enqueue).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/subjects/{subjectKey}/metrics/{metricKey}/usage/receipt": {
+      "get": {
+        "summary": "Get usage receipt for a subject and metric",
+        "description": "Returns an aggregated usage receipt for a given subject, metric, and billing period.",
+        "operationId": "getUserUsageReceipt",
+        "parameters": [
+          {
+            "name": "subjectKey",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Identifier for the subject (e.g. user or account)."
+          },
+          {
+            "name": "metricKey",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Identifier for the metric."
+          },
+          {
+            "name": "periodType",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": ["day", "week", "month"]
+            },
+            "description": "Billing period type for the receipt."
+          },
+          {
+            "name": "anchorDate",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Optional anchor date used to determine the billing period boundary."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Usage receipt found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsageReceipt"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request parameters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/subjects/{subjectKey}/metrics/{metricKey}/usage/history": {
+      "get": {
+        "summary": "Get historical usage for a subject and metric",
+        "description": "Returns a time-series of usage buckets for a given subject, metric, and date range.",
+        "operationId": "getUsageHistory",
+        "parameters": [
+          {
+            "name": "subjectKey",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Identifier for the subject (e.g. user or account)."
+          },
+          {
+            "name": "metricKey",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Identifier for the metric."
+          },
+          {
+            "name": "rangeStart",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Inclusive start of the requested range (ISO 8601)."
+          },
+          {
+            "name": "rangeEnd",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Exclusive end of the requested range (ISO 8601)."
+          },
+          {
+            "name": "frequency",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": ["day", "week", "month"]
+            },
+            "description": "Bucket frequency for aggregating usage."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Historical usage returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsageHistoryResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request parameters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/metrics/{metricKey}/usage/longitudinal": {
+      "get": {
+        "summary": "Get longitudinal usage across subjects for a metric",
+        "description": "Returns a time-series of usage buckets across one or more subjects for a given metric and date range.",
+        "operationId": "getLongitudinalUsage",
+        "parameters": [
+          {
+            "name": "metricKey",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Identifier for the metric."
+          },
+          {
+            "name": "rangeStart",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Inclusive start of the requested range (ISO 8601)."
+          },
+          {
+            "name": "rangeEnd",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Exclusive end of the requested range (ISO 8601)."
+          },
+          {
+            "name": "frequency",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": ["day", "week", "month"]
+            },
+            "description": "Bucket frequency for aggregating usage."
+          },
+          {
+            "name": "subjectKeys",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "style": "form",
+            "explode": true,
+            "description": "Optional list of subject identifiers to restrict the aggregation to. Can be provided as repeated query parameters or comma-separated values."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Longitudinal usage returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LongitudinalUsageResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request parameters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "MeteringHmac": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-metering-signature",
+        "description": "HMAC signature of the raw request body. The request must also include an `x-metering-timestamp` header used in signature computation."
+      }
+    },
+    "schemas": {
+      "TriggerEventInput": {
+        "type": "object",
+        "description": "Input payload for the body of a metering event. The subject and metric identifiers are provided via the URL path.",
+        "properties": {
+          "quantity": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1,
+            "description": "Positive integer quantity for the event."
+          },
+          "occurredAt": {
+            "oneOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "string",
+                "description": "String representation of a date/time."
+              }
+            ],
+            "description": "When the event occurred. If omitted, the server uses the current time."
+          },
+          "source": {
+            "type": "string",
+            "description": "Optional identifier for the source system of the event."
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Arbitrary key/value metadata associated with the event."
+          },
+          "eventKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional caller-provided idempotency key for the event."
+          },
+          "processInline": {
+            "type": "boolean",
+            "description": "If true, the event will be processed synchronously in the request transaction instead of being enqueued."
+          }
+        },
+        "required": [
+          "quantity"
+        ],
+        "additionalProperties": false
+      },
+      "TriggerEventResult": {
+        "type": "object",
+        "description": "Response returned when a metering event is accepted.",
+        "properties": {
+          "accepted": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "description": "Indicates that the event was accepted."
+          },
+          "eventKey": {
+            "type": "string",
+            "description": "Idempotency key associated with the event."
+          },
+          "queuedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp (ISO 8601) when the event was queued or processed."
+          }
+        },
+        "required": [
+          "accepted",
+          "eventKey",
+          "queuedAt"
+        ],
+        "additionalProperties": false
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "description": "Generic error wrapper used by the metering API.",
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Human-readable error message."
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "additionalProperties": false
+      },
+      "UsageReceipt": {
+        "type": "object",
+        "description": "Aggregated usage receipt for a single subject and metric over a billing period.",
+        "properties": {
+          "subjectKey": {
+            "type": "string"
+          },
+          "metricKey": {
+            "type": "string"
+          },
+          "periodType": {
+            "type": "string",
+            "enum": ["day", "week", "month"]
+          },
+          "periodStart": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "periodEnd": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "totalUsage": {
+            "type": "string",
+            "description": "Total usage during the period, represented as a stringified integer."
+          },
+          "eventCount": {
+            "type": "string",
+            "description": "Number of underlying events, represented as a stringified integer."
+          },
+          "lastAggregatedAt": {
+            "type": ["string", "null"],
+            "format": "date-time",
+            "description": "When the usage was last aggregated, if applicable."
+          }
+        },
+        "required": [
+          "subjectKey",
+          "metricKey",
+          "periodType",
+          "periodStart",
+          "periodEnd",
+          "totalUsage",
+          "eventCount"
+        ],
+        "additionalProperties": false
+      },
+      "UsageHistoryBucket": {
+        "type": "object",
+        "properties": {
+          "bucketStart": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "bucketEnd": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "total": {
+            "type": "string",
+            "description": "Total usage in the bucket, represented as a stringified integer."
+          },
+          "eventCount": {
+            "type": "string",
+            "description": "Number of events in the bucket, represented as a stringified integer."
+          }
+        },
+        "required": [
+          "bucketStart",
+          "bucketEnd",
+          "total",
+          "eventCount"
+        ],
+        "additionalProperties": false
+      },
+      "UsageHistoryResult": {
+        "type": "object",
+        "description": "Historical usage across time buckets for a single subject and metric.",
+        "properties": {
+          "subjectKey": {
+            "type": "string"
+          },
+          "metricKey": {
+            "type": "string"
+          },
+          "frequency": {
+            "type": "string",
+            "enum": ["day", "week", "month"]
+          },
+          "rangeStart": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "rangeEnd": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "buckets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UsageHistoryBucket"
+            }
+          }
+        },
+        "required": [
+          "subjectKey",
+          "metricKey",
+          "frequency",
+          "rangeStart",
+          "rangeEnd",
+          "buckets"
+        ],
+        "additionalProperties": false
+      },
+      "LongitudinalUsageBucket": {
+        "type": "object",
+        "properties": {
+          "bucketStart": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "bucketEnd": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "total": {
+            "type": "string",
+            "description": "Total usage in the bucket across all subjects, represented as a stringified integer."
+          },
+          "eventCount": {
+            "type": "string",
+            "description": "Total number of events in the bucket across all subjects, represented as a stringified integer."
+          }
+        },
+        "required": [
+          "bucketStart",
+          "bucketEnd",
+          "total",
+          "eventCount"
+        ],
+        "additionalProperties": false
+      },
+      "LongitudinalUsageResult": {
+        "type": "object",
+        "description": "Historical usage across time buckets for a metric, optionally restricted to a subset of subjects.",
+        "properties": {
+          "metricKey": {
+            "type": "string"
+          },
+          "frequency": {
+            "type": "string",
+            "enum": ["day", "week", "month"]
+          },
+          "rangeStart": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "rangeEnd": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "subjectScope": {
+            "type": "string",
+            "enum": ["global", "subset"]
+          },
+          "buckets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LongitudinalUsageBucket"
+            }
+          }
+        },
+        "required": [
+          "metricKey",
+          "frequency",
+          "rangeStart",
+          "rangeEnd",
+          "subjectScope",
+          "buckets"
+        ],
+        "additionalProperties": false
+      }
+    }
+  }
+}
+

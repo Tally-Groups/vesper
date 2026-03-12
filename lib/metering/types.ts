@@ -9,8 +9,6 @@ export interface TriggerEventInput {
   source?: string;
   metadata?: Record<string, unknown>;
   eventKey?: string;
-  signature?: string;
-  timestamp?: string;
   processInline?: boolean;
 }
 

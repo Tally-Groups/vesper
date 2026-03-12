@@ -2,15 +2,25 @@ import { NextRequest } from 'next/server';
 import { getUserUsageReceipt } from '@/lib/metering/get-user-usage-receipt';
 import { periodTypeSchema } from '@/lib/metering/validators';
 
+// RESTful usage receipt endpoint for a specific subject and metric.
+// subjectKey and metricKey now come from the URL path; period parameters stay in the query string.
 export const runtime = 'edge';
 
-export async function GET(req: NextRequest) {
+type RouteParams = {
+  subjectKey: string;
+  metricKey: string;
+};
+
+export async function GET(
+  req: NextRequest,
+  context: { params: RouteParams },
+) {
   const { searchParams } = new URL(req.url);
 
-  const subjectKey = searchParams.get('subjectKey') ?? '';
-  const metricKey = searchParams.get('metricKey') ?? '';
   const periodTypeRaw = searchParams.get('periodType') ?? '';
   const anchorDate = searchParams.get('anchorDate') ?? undefined;
+
+  const { subjectKey, metricKey } = context.params;
 
   try {
     const periodType = periodTypeSchema.parse(periodTypeRaw);
@@ -24,7 +34,8 @@ export async function GET(req: NextRequest) {
 
     return new Response(JSON.stringify(receipt), { status: 200 });
   } catch (err) {
-    console.error('Error in /api/metering/receipt', err);
+    console.error('Error in REST /api/subjects/[subjectKey]/metrics/[metricKey]/usage/receipt', err);
     return new Response(JSON.stringify({ error: 'Invalid request' }), { status: 400 });
   }
 }
+

@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { getUsageHistory } from '@/lib/metering/get-usage-history';
+import { jsonBigIntReplacer } from '@/lib/metering/json';
 import { frequencySchema } from '@/lib/metering/validators';
 
 // RESTful usage history endpoint for a specific subject and metric.
@@ -34,7 +35,7 @@ export async function GET(
       frequency,
     });
 
-    return new Response(JSON.stringify(result), { status: 200 });
+    return new Response(JSON.stringify(result, jsonBigIntReplacer), { status: 200 });
   } catch (err) {
     console.error('Error in REST /api/subjects/[subjectKey]/metrics/[metricKey]/usage/history', err);
     return new Response(JSON.stringify({ error: 'Invalid request' }), { status: 400 });

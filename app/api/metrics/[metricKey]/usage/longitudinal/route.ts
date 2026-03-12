@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { getLongitudinalUsage } from '@/lib/metering/get-longitudinal-usage';
+import { jsonBigIntReplacer } from '@/lib/metering/json';
 import { frequencySchema } from '@/lib/metering/validators';
 
 // RESTful longitudinal usage endpoint for a metric across subjects.
@@ -41,7 +42,7 @@ export async function GET(
       subjectKeys,
     });
 
-    return new Response(JSON.stringify(result), { status: 200 });
+    return new Response(JSON.stringify(result, jsonBigIntReplacer), { status: 200 });
   } catch (err) {
     console.error('Error in REST /api/metrics/[metricKey]/usage/longitudinal', err);
     return new Response(JSON.stringify({ error: 'Invalid request' }), { status: 400 });

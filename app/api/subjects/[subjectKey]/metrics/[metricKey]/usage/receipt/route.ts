@@ -13,14 +13,14 @@ type RouteParams = {
 
 export async function GET(
   req: NextRequest,
-  context: { params: RouteParams },
+  context: { params: Promise<RouteParams> },
 ) {
   const { searchParams } = new URL(req.url);
 
   const periodTypeRaw = searchParams.get('periodType') ?? '';
   const anchorDate = searchParams.get('anchorDate') ?? undefined;
 
-  const { subjectKey, metricKey } = context.params;
+  const { subjectKey, metricKey } = await context.params;
 
   try {
     const periodType = periodTypeSchema.parse(periodTypeRaw);

@@ -13,7 +13,7 @@ type RouteParams = {
 
 export async function GET(
   req: NextRequest,
-  context: { params: RouteParams },
+  context: { params: Promise<RouteParams> },
 ) {
   const { searchParams } = new URL(req.url);
 
@@ -21,7 +21,7 @@ export async function GET(
   const rangeEnd = searchParams.get('rangeEnd') ?? '';
   const frequencyRaw = searchParams.get('frequency') ?? '';
 
-  const { subjectKey, metricKey } = context.params;
+  const { subjectKey, metricKey } = await context.params;
 
   try {
     const frequency = frequencySchema.parse(frequencyRaw);

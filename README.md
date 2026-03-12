@@ -1,39 +1,72 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Vesper
 
-## Getting Started
+Usage metering for Next.js: ingest events, store them in Postgres, and query daily rollups, usage receipts, and time-series history. Built for Vercel (Queues + Cron) and designed for idempotent, HMAC-signed ingestion.
 
-First, run the development server:
+## Features
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- **HMAC-signed ingestion** – Clients sign request bodies; the server verifies before accepting events.
+- **Idempotency** – Deterministic event keys and unique constraints prevent double-counting.
+- **Daily rollups** – Per-subject and global aggregates in `lib/metering` with Prisma.
+- **Cleanup cron** – Optional 90-day raw event retention with a protected cleanup route.
+- **Rebuild/backfill** – Internal API to rebuild rollups from raw events for repair or backfill.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Tech stack
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- **Next.js 16** (App Router), **TypeScript**, **Prisma**, **PostgreSQL**
+- **Vercel** – Queues for async event processing, Cron for cleanup
+- **Zod** for validation, **Vitest** for tests
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Getting started
 
-## Learn More
+1. **Clone and install**
 
-To learn more about Next.js, take a look at the following resources:
+   ```bash
+   git clone <repo-url>
+   cd vesper
+   pnpm install
+   ```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+2. **Environment**
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+   Copy the example env and set required variables:
 
-## Deploy on Vercel
+   ```bash
+   cp .env.example .env
+   ```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+   | Variable | Description |
+   | -------- | ----------- |
+   | `DATABASE_URL` | PostgreSQL connection string |
+   | `METERING_HMAC_SECRET` | Shared secret for HMAC verification (ingestion) |
+   | `METERING_CRON_SECRET` | Secret for cron/repair routes (cleanup, rebuild) |
+   | `METERING_QUEUE_NAME` | Vercel Queue topic name (default: `metering-events`) |
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+   For local Vercel Queues, run `vercel link` and `vercel env pull` as needed.
+
+3. **Database**
+
+   ```bash
+   pnpm exec prisma migrate dev
+   ```
+
+4. **Run**
+
+   ```bash
+   pnpm dev
+   ```
+
+   Open [http://localhost:3000](http://localhost:3000).
+
+## Scripts
+
+| Command | Description |
+| ------- | ----------- |
+| `pnpm dev` | Start dev server |
+| `pnpm build` | Production build |
+| `pnpm start` | Start production server |
+| `pnpm test` | Run tests (watch) |
+| `pnpm test:ci` | Run tests once with coverage (fails if &lt; 95%) |
+| `pnpm lint` | Run ESLint |
 
 ## Metering subsystem
 
@@ -45,55 +78,35 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
   - `MeteringGlobalRollupDay` (global per-metric daily aggregates)
 - **Write path**:
   - Clients sign a canonical JSON body with HMAC-SHA256 using `METERING_HMAC_SECRET`.
-  - `/api/metering/events` verifies the HMAC on the raw body, then calls `triggerEvent`.
-  - `triggerEvent` validates input, builds a deterministic `eventKey`, and publishes to the Vercel Queue topic `metering-events` (or processes inline in tests).
-  - `/api/queues/metering` is the queue consumer; it runs a single DB transaction that inserts the raw event and updates daily and global rollups.
-- **Read path**:
-  - `getUserUsageReceipt` reads from `MeteringRollupDay` to return totals for a subject/metric over a day, week, or month.
-  - `getUsageHistory` returns zero-filled daily/weekly/monthly time series for one subject and metric.
-  - `getLongitudinalUsage` returns zero-filled time series across all subjects (global) or a provided set of subject keys.
+  - `app/api/metering/events/route.ts` verifies the HMAC on the raw body, then calls `triggerEvent` from `lib/metering/trigger-event`.
+  - `triggerEvent` validates input, builds a deterministic `eventKey`, and publishes to the Vercel Queue topic (or processes inline in tests).
+  - `app/api/queues/metering/route.ts` is the queue consumer; it runs a single DB transaction that inserts the raw event and updates daily and global rollups.
+- **Read path** (implemented in `lib/metering/`):
+  - `getUserUsageReceipt` – totals for a subject/metric over a day, week, or month.
+  - `getUsageHistory` – zero-filled daily/weekly/monthly time series for one subject and metric.
+  - `getLongitudinalUsage` – zero-filled time series across all subjects (global) or a subset.
 
 ### Idempotency model
 
-- **Deterministic event keys**:
-  - `buildMeteringEventKey` prefers a caller-supplied `eventKey`.
-  - Otherwise it hashes a canonical JSON of `subjectKey`, `metricKey`, `quantity`, `occurredAt`, `source`, and optional `metadata.externalRef`.
-  - `MeteringEvent.eventKey` is unique, so duplicate deliveries from the queue are rejected by Postgres, not app logic.
-- **Transactional rollups**:
-  - If the `MeteringEvent` insert succeeds, the same transaction upserts daily and global rollups and increments `total` and `eventCount`.
-  - If the insert fails with a unique constraint error, the handler treats the message as a safe duplicate and exits without double-counting.
+- **Deterministic event keys**: `buildMeteringEventKey` (in `lib/metering/idempotency`) prefers a caller-supplied `eventKey`; otherwise it hashes a canonical JSON of the event fields. `MeteringEvent.eventKey` is unique, so duplicate queue deliveries are rejected by Postgres.
+- **Transactional rollups**: One transaction inserts the raw event and upserts daily and global rollups. On unique constraint violation, the handler treats the message as a duplicate and exits without double-counting.
 
-### HMAC verification model
+### HMAC verification
 
-- **Client → server only**:
-  - Clients compute `signPayload(`${timestamp}.${rawBody}`, METERING_HMAC_SECRET)` and send it as `x-metering-signature` plus `x-metering-timestamp`.
-  - `/api/metering/events` recomputes the HMAC over the raw body and timestamp and uses a constant‑time comparison.
-  - Requests with invalid signatures or stale timestamps are rejected before any queuing or DB writes occur.
-- **No server → client verification**:
-  - The metering system never sends signed messages back to clients; all verification is ingress-only.
+- **Client → server only**: Clients send `x-metering-signature` and `x-metering-timestamp`; the server recomputes the HMAC over `${timestamp}.${rawBody}` and uses constant-time comparison. Invalid or stale requests are rejected before any queuing or DB writes.
+- The metering system does not sign responses; verification is ingress-only.
 
-### Cleanup strategy
+### Cleanup
 
-- **Raw event retention**:
-  - Raw events are kept for 90 days to support repair/rebuild operations.
-  - `/api/internal/metering/cleanup` is a protected route that:
-    - Authorizes via `METERING_CRON_SECRET` (header or bearer token).
-    - Deletes `MeteringEvent` rows older than 90 days in bounded batches.
-  - `vercel.json` configures a daily Vercel Cron at 03:17 UTC that calls this route.
-- **Rollups**:
-  - Daily rollups are kept indefinitely by default; you can add pruning later if needed.
+- Raw events are retained for 90 days. `app/api/internal/metering/cleanup/route.ts` is protected by `METERING_CRON_SECRET` and deletes old events in batches. `vercel.json` configures a daily Cron at 03:17 UTC to call this route.
+- Daily rollups are kept indefinitely unless you add pruning.
 
 ### Extension points
 
-- **Additional metrics / subjects**:
-  - `subjectKey` and `metricKey` are opaque strings; you can represent users, workspaces, orgs, or global aggregates without schema changes.
-- **Billing & plans**:
-  - Add a separate billing module that consumes the existing read API (`getUserUsageReceipt`, `getUsageHistory`, `getLongitudinalUsage`) and applies allowances or pricing logic.
-- **Custom rebuilds**:
-  - `/api/internal/metering/rebuild` can rebuild rollups from raw events for:
-    - A single subject + metric,
-    - A specific metric across all subjects,
-    - A specific subject across all metrics,
-    - Or a wider scope over a given time range.
-  - This route is also protected by `METERING_CRON_SECRET` and is intended for internal repair/backfill tasks.
+- **Metrics/subjects**: `subjectKey` and `metricKey` are opaque strings; use them for users, workspaces, orgs, or global aggregates without schema changes.
+- **Billing**: Add a billing module that calls `getUserUsageReceipt`, `getUsageHistory`, and `getLongitudinalUsage` and applies pricing or allowances.
+- **Rebuild**: `app/api/internal/metering/rebuild/route.ts` can rebuild rollups from raw events for a subject+metric, a metric, a subject, or a date range. Protected by `METERING_CRON_SECRET`.
 
+## License
+
+MIT. See [LICENSE](LICENSE).

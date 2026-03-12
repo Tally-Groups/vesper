@@ -1,19 +1,21 @@
 {
   "name": "vesper",
   "version": "0.1.0",
-  "private": true,
+  "license": "MIT",
+  "private": false,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest"
+    "test": "vitest",
+    "test:ci": "vitest run --coverage"
   },
   "dependencies": {
+    "@prisma/client": "^6.3.0",
     "next": "16.1.6",
     "react": "19.2.3",
     "react-dom": "19.2.3",
-    "@prisma/client": "^6.3.0",
     "zod": "^3.24.1"
   },
   "devDependencies": {
@@ -21,12 +23,13 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitest/coverage-v8": "^2.1.4",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "prisma": "^6.3.0",
     "tailwindcss": "^4",
-    "typescript": "^5",
     "ts-node": "^10.9.2",
+    "typescript": "^5",
     "vitest": "^2.1.4"
   }
 }
